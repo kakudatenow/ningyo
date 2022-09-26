@@ -1,0 +1,497 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html lang="ja">
+<HEAD>
+<meta http-equiv="content-type" content="text/html; charset=Shift_JIS">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<META http-equiv="Content-Style-Type" content="text/css">
+<meta name="description" content="角館のお祭りデータベース写真">
+<title>角館のお祭りデータベース写真</title>
+<style type="text/css">
+<!--
+#header {
+	height:100%;
+	width:100%;
+	color:#b5b5b5;
+	background-color:black;
+	font-size:10pt;
+/*	font-family:'ＭＳ 明朝',osaka,serif;"*/
+	font-family: "游明朝", YuMincho, "ヒラギノ明朝 ProN W3", "Hiragino Mincho ProN", "HG明朝E", "ＭＳ Ｐ明朝", "ＭＳ 明朝", serif;
+/*	font-family:'ヒラギノ角ゴ Pro W3','Hiragino Kaku Gothic Pro','メイリオ',Meiryo,'ＭＳ Ｐゴシック',sans-serif;*/
+}
+
+.ctrl {
+	font-weight:600;
+}
+
+#photo {
+	color:slateblue;
+    font-size:12pt;
+}
+
+#photoSrc {
+/*    margin:10px 16px 3px 16px;*/
+    margin:16px;
+    border-width:2px;
+    border-style:ridge;
+    border-color:slateblue;
+}
+#comment {
+    color:whitesmoke;
+    font-size:11pt;
+    font-family:"ＭＳ 明朝",osaka,serif;
+}
+#gedai {
+    color:whitesmoke;
+    font-size:11pt;
+    font-weight:bold;
+    font-family:"ＭＳ 明朝",osaka,serif;
+}
+.link {
+	color:white;
+    font-size:10pt;
+    background-color:midnightblue;
+}
+.link:link {
+    color:#bcb6de;
+    text-decoration:none;
+}
+.link:visited {
+    color:#bcb6de;
+    text-decoration:none;
+}
+.link:hover {
+    color:black;
+    background-color:orange;
+}
+
+#photoList {
+	display:block;
+}
+
+#photoList a {
+	margin:0px 3px 0px 0px;
+	width:16px;
+}
+#photoList a:link, #photoList a:visited {
+    background-color:midnightblue;
+	color:#bcb6de;
+	text-align:center;
+}
+#photoList a:hover {
+	background-color:orange;
+    color:black;
+}
+
+#closeBtn {
+	font-size:11px;
+}
+-->
+</style>
+<script type="text/javascript" language="JavaScript" src="Class.js"></script>
+<script type="text/javascript" src="ningyou.js?date=2022Sep23"></script>  <!-- ningyou.js : 人形の情報を格納したファイル -->
+<script type="text/javascript" src="photo4.js?date=2022Sep23"></script>
+<script language="javascript" type="text/javascript">
+<!--
+	var baseYear = 1949;	// 昭和10
+    var qStr = new Array();
+    parseQueryString(qStr);
+    var yearIndex = qStr.year;
+    var chounaiIndex = qStr.chounai;
+    var mainWin = qStr.mainWin;
+    var photoNo = qStr.photoNo;
+    yearIndex -= 0;
+    chounaiIndex -= 0;
+    photoNo -= 0;
+
+/*	if (typeof photo[yearIndex][chounaiIndex] == "object") {	// 写真が複数枚あった場合
+	    if (photoNo) {		// photoNoが指定されている場合
+	    	photoNo -= 0;
+	    }
+	    else {
+	    	photoNo = 0;
+	    }
+	}
+	else {
+		photoNo = undefined;	// 変数 undefined は、未定義だから photoNo は undefined になる。
+	}
+*/
+    //alert(yearIndex + ", " + chounaiIndex + ", " + photoNo + ", " + mainWin);
+    
+    var photoHistory = new PhotoStack();	// 表示した写真のヒストリを管理するオブジェクト
+    var allWin = new AllWin();				// keepで開いた全てのウィンドウを管理するオブジェクト
+	var year;			// 漢字表記
+	var chounaiName;	// 漢字名
+	
+	var PhotoListElm = null;	// id=photoListのエレメント
+	var PhotoElm = null;			// id=photoのエレメント
+	var Header = null;			// 上部のヘッダーのエレメント(table)
+	
+	window.onload = init;
+	
+	
+    function init() {
+		PhotoListElm = document.getElementById("photoList");
+		PhotoElm = document.getElementById("photo");
+		Header = document.getElementById("header");
+		
+      	photoHistory.push({yearIndex:yearIndex, chounaiIndex:chounaiIndex, photoNo:photoNo});
+      	imageChange2(yearIndex, chounaiIndex, photoNo);
+		
+     	document.getElementById("closeBtn").style.display = 'none';
+     	if (mainWin != "1") {
+      		document.getElementById("keepBtn").style.display = 'none';
+  		}
+	}
+	
+	
+// 丁内の変更 ------------------------------------------------------------------------------
+    function prevChounai() {
+   		if (--chounaiIndex < 0) {
+   			chounaiIndex = photo[yearIndex].length-1;
+		}
+		changeChounai();
+    }
+    
+    function nextChounai() {
+   		if (++chounaiIndex > photo[yearIndex].length-1) {
+   			chounaiIndex = 0;
+		}
+		changeChounai();
+    }
+    
+    function changeChounai() {
+     	chounaiName = chounai[chounaiIndex];
+/*     	if (photo[yearIndex][chounaiIndex] != "") {
+      		var filename = getfilename(yearIndex, chounaiIndex);
+ 		}
+   		else {
+   			var filename = "";
+   		}*/
+    	var gedai = ningyou[yearIndex].gedai[chounaiIndex];
+    	
+      	photoHistory.push({yearIndex:yearIndex, chounaiIndex:chounaiIndex, photoNo:photoNo});
+    	imageChange2(yearIndex, chounaiIndex);
+    }
+
+
+
+// 年の変更 ------------------------------------------------------------------------------
+    function prevYear() {
+    	if (--yearIndex < 0) {
+    		yearIndex = photo.length-1;
+    	}
+    	changeYear();
+    }
+    
+    function nextYear() {
+    	if (++yearIndex > photo.length-1) {
+    		yearIndex = 0;
+    	}
+    	changeYear();
+    }
+    
+    function changeYear() {
+     	year = yearFormat(yearIndex);
+/*     	if (photo[yearIndex][chounaiIndex] != "") {
+       		var filename = getfilename(yearIndex, chounaiIndex);
+  		}
+   		else {
+   			var filename = "";
+   		}*/
+    	var gedai = ningyou[yearIndex].gedai[chounaiIndex];
+    	
+      	photoHistory.push({yearIndex:yearIndex, chounaiIndex:chounaiIndex, photoNo:photoNo});
+   		imageChange2(yearIndex, chounaiIndex);
+    }
+// ------------------------------------------------------------------------------
+
+
+    // 2005Oct8 年、丁内の移動機能を加えたことに対応。直接index.htmlから呼び出される。
+    function imageChangeNew(yearArg, chounaiArg, photoNoArg, isNewPhoto) {
+    	yearIndex = yearArg;		// global変数に保存。
+    	chounaiIndex = chounaiArg;	// global変数に保存。
+    	photoNo = photoNoArg;
+/*		if (typeof photo[yearIndex][chounaiIndex] == "object") {	// 写真が複数枚あった場合
+    		photoNo = photoNoArg;	// global変数に保存。
+		    if (photoNo) {			// photoNoが指定されている場合
+		    	photoNo -= 0;
+		    }
+		    else {
+		    	photoNo = 0;
+		    }
+		}
+		else {
+			photoNo = undefined;	// 変数 undefined は、未定義だから photoNo は undefined になる。
+		}
+*/
+     	photoHistory.push({yearIndex:yearArg, chounaiIndex:chounaiArg, photoNo:photoNo});
+    	imageChange2(yearArg, chounaiArg, photoNo, isNewPhoto);
+	}
+	
+	
+    function imageChange2(yearIndex, chounaiIndex, photoNoArg, isNewPhoto) {
+		if (typeof photo[yearIndex][chounaiIndex] == "object") {	// 写真が複数枚あった場合
+		    if (! photoNoArg) {	// photoNoArgが指定されていない場合
+				photoNo = 0;
+		    }
+		    else {
+		    	photoNo = photoNoArg;
+		    }
+		}
+		else {
+			photoNo = undefined;	// 変数 undefined は、未定義だから photoNo は undefined になる。
+		}
+		//window.status = "photoNo[" + photoNo + "]";
+		console.log("photoNo[" + photoNo + "]");
+		
+		var fname = getfilename(yearIndex, chounaiIndex, photoNo);
+		
+    	//Photo.style.visibility = "hidden";
+    	if (typeof fname == "undefined" || fname.length == 0) {
+        // 	PhotoElm.src = '';
+        //	document.getElementById("noPhoto").style.display = '';
+	        document.getElementById("nowloading").style.display = "none";
+	        PhotoElm.innerHTML = "この年の写真はありません。"
+		}
+        else {
+        // 	PhotoElm.src = fname;
+        //	document.getElementById("noPhoto").style.display = 'none';
+        	document.getElementById("nowloading").style.display = "inline";
+        	PhotoElm.style.display = "none";
+	        PhotoElm.innerHTML = "<img id='photoSrc' src='" + fname + "' onLoad='onLoaded(this);'>"
+      	}
+      	
+        commentWrite(yearFormat(yearIndex), chounai[chounaiIndex], ningyou[yearIndex].gedai[chounaiIndex]);
+        
+     	crePhotoList(yearIndex, chounaiIndex, photoNo);
+    	historyBtnVisCtrl();
+		
+        if (isNewPhoto) {
+        	allWin.focus();
+        //	window.blur();
+        //	window.focus();
+        }
+	}
+    
+    
+    
+    // 写真のURLを返す
+	function getfilename(yearIndex, chounaiIndex, photoNo) {
+		if (typeof photoNo == "number") {
+			if (photo[yearIndex][chounaiIndex][photoNo]) {
+				if (photo[yearIndex][chounaiIndex][photoNo]) {
+					return("img/"+(yearIndex+baseYear)+"/"+photo[yearIndex][chounaiIndex][photoNo]);
+				}
+			}
+		}
+		else {
+			// photoNoが設定されていないということは、写真は1枚しかない
+			if (photo[yearIndex][chounaiIndex]) {
+	    		return("img/"+(yearIndex+baseYear)+"/"+photo[yearIndex][chounaiIndex]);
+	    	}
+		}
+		return(undefined);
+	}
+	
+	
+	
+    // photoListが表示されているとき、選択された写真の番号の表示をActive状態にする。
+    function setActivePhotoNo(photoNo) {
+    	for (var i=0; i<PhotoListElm.childNodes.length; i++) {
+    		PhotoListElm.childNodes[i].style.textDecoration = "none";
+    	}
+    	PhotoListElm.childNodes[photoNo].style.textDecoration = "underline";
+    }
+    
+    
+	
+    // 写真番号の表示の制御。1枚しかないときは非表示となる。
+	// global変数として、year, chounaiNameを必要とする
+	function crePhotoList(yearIndex, chounaiIndex, photoNo) {
+		PhotoListElm.innerHTML = "";
+		if (typeof photo[yearIndex][chounaiIndex] == "object") {
+			var wStr = Math.floor(160 / photo[yearIndex][chounaiIndex].length) - 3 + "px";
+			//var wStr = Math.floor(1 / photo[yearIndex][chounaiIndex].length * 100) + "%";	// 写真へのリンクの横幅
+			
+			for (var i=0; i<photo[yearIndex][chounaiIndex].length; i++) {
+				if (i == photoNo) {		// 現在表示される写真の番号
+					PhotoListElm.innerHTML += "<a href='#' class='link' style='display:block; float:left; width:" + wStr + "; font-weight:bold; ' onclick='changePhotoNo(" + i + ");'>" + (i+1) + "<\/a>";
+				}
+				else {
+					PhotoListElm.innerHTML += "<a href='#' class='link' style='display:block; float:left; width:" + wStr + "; 'onclick='changePhotoNo(" + i + ");'>" + (i+1) + "<\/a>";
+				}
+			}
+			PhotoListElm.style.display = "inline";	// @@@
+		}
+		else {
+			PhotoListElm.style.display = "none";
+		}
+	}
+	
+	
+	
+	// 写真番号の変更（複数写真があるとき） ----------------------------------------------------
+	function changePhotoNo(photoNoArg) {
+    	photoNo = photoNoArg;		// global変数に保存。
+      	photoHistory.push({yearIndex:yearIndex, chounaiIndex:chounaiIndex, photoNo:photoNo});
+		imageChange2(yearIndex, chounaiIndex, photoNo);
+	}
+	
+	
+	
+	// 戻る、進むボタンの表示の制御
+    function historyBtnVisCtrl() {
+    //	alert("historyBtnVisCtrl :" + photoHistory.getIndex() + ", " + photoHistory.getLength());
+    	
+    	if (photoHistory.getIndex() <= 0) {
+    		document.getElementById("backBtn").style.visibility = 'hidden';
+    	}
+    	else {
+    		document.getElementById("backBtn").style.visibility = 'visible';
+   		}
+   		
+    	if (photoHistory.getIndex() >= photoHistory.getLength()-1) {
+    		document.getElementById("forwardBtn").style.visibility = 'hidden';
+    	}
+    	else {
+    		document.getElementById("forwardBtn").style.visibility = 'visible';
+   		}
+    }
+	
+	
+	
+    function forward() {	// 進むボタンがclickされたときの処理
+   		var p = photoHistory.forward();
+   		if (p != null) {
+   			yearIndex = p.yearIndex;
+   			chounaiIndex = p.chounaiIndex;
+   			photoNo = p.photoNo;
+    		imageChange2(p.yearIndex, p.chounaiIndex, p.photoNo);
+  		}
+	}
+	
+	
+	
+    function back() {	// 戻るボタンがclickされたときの処理
+    	var p = photoHistory.back();
+    	if (p != null) {
+    		yearIndex = p.yearIndex;
+   			chounaiIndex = p.chounaiIndex;
+   			photoNo = p.photoNo;
+    		imageChange2(p.yearIndex, p.chounaiIndex, p.photoNo);
+   		}
+	}
+    
+    
+    
+    // 年、丁内、外題を表示する
+    function commentWrite(year, chounai, gedai) {
+        document.getElementById("comment").innerHTML = year + "　" + chounai;
+        if (gedai.length > 0) {
+        	document.getElementById("gedai").innerHTML = gedai;
+        }
+        else {
+        	document.getElementById("gedai").innerHTML = "この年の外題は不明です";
+        }
+    }
+    
+    
+    function getWindowInnerWidth(){
+      if(window.opera || document.all)   
+          return document.body.clientWidth;
+      else
+          return window.innerWidth;
+    }
+    
+    function getWindowInnerHeight(){
+      if(window.opera || document.all) 
+          return document.body.clientHeight;
+      else
+          return window.innerHeight;
+    }
+    
+    function another() {
+	//	var winId = imgopen(photoHistory.current().filename, photoHistory.current().year, photoHistory.current().chounai, photoHistory.current().gedai);
+		var winId = imgopen();
+        allWin.push(winId);
+     	document.getElementById("closeBtn").style.display = 'block';
+    }
+    
+    function allWinClose() {
+    	allWin.close();
+     	document.getElementById("closeBtn").style.display = 'none';
+    }
+    
+//	function imgopen(filename, jpYear, chounaiName, gedai) {
+	function imgopen() {
+        var d = new Date();
+        var winName = d.getTime();
+        photoWin = window.open("photo4.html?year="+yearIndex+"&chounai="+chounaiIndex+"&photoNo="+photoNo+"&mainWin=0", winName, "height=420,width=420,toolbar=no,location=no,directory=no,scrollbars=no,status=no,menubar=no,resizable=yes,alwaysRaised=yes,titlebar=no,dependent=yes");
+        return(photoWin);
+    }
+    
+    
+    
+    var savePhotoW, savePhotoH;
+    
+    function onLoaded(photo) {
+        document.getElementById("nowloading").style.display = "none";
+        PhotoElm.style.display = "inline";
+    	if (savePhotoW != photo.width || savePhotoH != photo.height) {	// 前の写真とサイズが違うときのみウィンドウをリサイズする
+    		savePhotoW = photo.width;
+    		savePhotoH = photo.height;
+        	var border = 2;
+        	var margin = 16;
+        	var headerH = 51;
+        	var winW = photo.width + (border + margin) * 2;
+        	var winH = photo.height + headerH + (border + margin) * 2;
+        	window.resizeTo(winW + (window.outerWidth - window.innerWidth), winH + (window.outerHeight - window.innerHeight));
+        }
+        //window.opner.blur();
+       	//window.focus();
+    }
+
+
+	function yearFormat(yearIndex) {
+    if (ningyou[yearIndex].year >=2019) {
+        return('令和' + (ningyou[yearIndex].year - 2018));
+    }
+	else if (ningyou[yearIndex].year >=1989) {
+		return('平成' + (ningyou[yearIndex].year - 1988));
+	}
+	else {
+		return('昭和' + (ningyou[yearIndex].year - 1925));
+		}
+	}
+
+
+	function parseQueryString(resultAr) {
+		if (location.search.length > 1) {
+			var argSets = location.search.substr(1).split("&"); 
+			for (var i in argSets) {
+				resultAr[argSets[i].split("=")[0]] = argSets[i].split("=")[1];
+			}
+		}
+	}
+
+//-->
+</script>
+</HEAD>
+<BODY bgcolor="#111144" style="margin:0px;overflow:hidden;">
+    <table id="header" border="0" cellpadding="0" cellspacing="0">
+        <tr style="height:25px;">
+        	<td class="ctrl" width="165" align="left"><a id="forwardBtn" class="link" href="javascript:forward();">&nbsp;進む&nbsp;</a>&nbsp;&nbsp;<a href="javascript:prevChounai()" class="link">&nbsp;&nbsp;左&nbsp;&nbsp;</a>丁内<a href="javascript:nextChounai()" class="link">&nbsp;&nbsp;右&nbsp;&nbsp;</a></td>
+        	<td width="*" align="center" style="padding-top:4px;"><span id="comment"></span></td>
+       		<td class="ctrl"width="160" align="right"><a id="keepBtn" class="link" href="javascript:another()">&nbsp;keep&nbsp;</a><br><a id="closeBtn" class="link" href="javascript:allWinClose();">他を閉じる</a></td>
+       	</tr>
+        <tr style="height:25px;">
+        	<td class="ctrl"align="left"><a id="backBtn" class="link" href="javascript:back();">&nbsp;戻る&nbsp;</a>&nbsp;&nbsp;<a href="javascript:prevYear()" class="link">&nbsp;&nbsp;昔&nbsp;&nbsp;</a>&nbsp;年&nbsp;<a href="javascript:nextYear()" class="link">&nbsp;&nbsp;新&nbsp;&nbsp;</a></td>
+        	<td width="*" align="center" style="padding-top:4px;padding-bottom:4px;"><span id="gedai"></span></td>
+        	<td ><div id="photoList"></div></td>
+        </tr>
+        <tr>
+        	<td colspan="3" style="border-top:ridge 1px slateblue; text-align:center; vertical-align:middle; background-color:#111144;"><span id="photo"></span><span id="nowloading"><img src="loading.gif" alt="NowLoading"></span></td>
+        </tr>
+	</table>
+</BODY>
+</HTML>
